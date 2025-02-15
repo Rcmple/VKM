@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-bmi(3hqj(t#r!(m7@4(1wera&93kb^i5zd!1dg1v&bl%4hb=9l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'strains',
+    'VKMauth',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -65,8 +66,26 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+    "http://localhost:5173",  # Новый порт Vite
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",  # Новый порт Vite
+]
+
+CORS_ALLOW_METHODS = [  # Разрешенные методы
+    'GET',
+    'POST',
+    'OPTIONS',
+]
+
+CORS_ALLOW_HEADERS = [  # Разрешенные заголовки
+    'Content-Type',
+    'X-CSRFToken',
+    'Authorization',
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'VKM.urls'
 
@@ -142,7 +161,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'frontend/build/static'),
+    os.path.join(BASE_DIR, '/static'),
 ]
 
 # Default primary key field type
