@@ -1,5 +1,5 @@
 from rest_framework.views import APIView
-from .serializers import AddStrainSerializer
+from .serializers import AddStrainSerializer, StrainSerializer, PreviewStrainsSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Strain
@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 def parse_date(date_str):
     if not date_str or date_str.lower() in ["null", "deleted", "nc"]:
@@ -21,12 +22,14 @@ def parse_date(date_str):
             return datetime.strptime(date_str.strip(), fmt).date()
         except ValueError:
             continue
-
-    print(f"⚠️ Неподдерживаемый формат даты: {date_str}")
     return None
 
-
-class AddStrain(APIView):
+class StrainInfoView(APIView):
+    def get(self, request, strain_id):
+        strain = get_object_or_404(Strain, strain_id=strain_id)
+        serializer = StrainSerializer(strain)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+class AddStrainView(APIView):
     def post(self, request):
         serializer = AddStrainSerializer(data = request.data)
         if serializer.is_valid():
@@ -47,12 +50,12 @@ class AddStrain(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ListStrains(APIView):
+class StrainsListView(APIView):
     def get(self, request):
-        strains = Strain.objects.order_by("strain_id")[:100]
-        serializer = AddStrainSerializer(strains, many = True)
+        strains = Strain.objects.filter(Remarks="cat").order_by("strain_id")
+        serializer = PreviewStrainsSerializer(strains, many=True)
         return Response(serializer.data)
-class UploadStrains(APIView):
+class UploadStrainsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]

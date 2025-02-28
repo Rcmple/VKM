@@ -5,6 +5,12 @@ class AddStrainSerializer(serializers.ModelSerializer):
         model = Strain
         fields = '__all__'
 
+class PreviewStrainsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Strain
+        fields = ['strain_id','Genus', 'Species', 'Family', 'Class', 'Risk_group']
+
 class StrainSerializer(serializers.ModelSerializer):
     Type = serializers.SerializerMethodField()
     ReceivedFrom = serializers.SerializerMethodField()
