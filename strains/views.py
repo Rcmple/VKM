@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from .serializers import AddStrainSerializer, StrainSerializer, PreviewStrainsSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Strain
+from .models import StrainModel, StrainModelChange
 import csv
 from datetime import datetime
 from django.core.files.storage import default_storage
@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+
 
 def parse_date(date_str):
     if not date_str or date_str.lower() in ["null", "deleted", "nc"]:
@@ -24,26 +24,65 @@ def parse_date(date_str):
             continue
     return None
 
+
+class SuggestEditStrainView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, strain_id):
+        try:
+            strain = StrainModel.objects.get(strain_id=strain_id)
+        except StrainModel.DoesNotExist:
+            return Response({
+                'error': {
+                    'ru': 'Штамм не найден',
+                    'en': 'Strain not found'
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        change = StrainModelChange.objects.create(
+            strain=strain,
+            changes=request.data,
+            changed_by=request.user
+        )
+
+        return Response({
+            'message': {
+                'ru': 'Изменения успешно предложены',
+                'en': 'Changes successfully suggested'
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
 class StrainInfoView(APIView):
     def get(self, request, strain_id):
-        strain = get_object_or_404(Strain, strain_id=strain_id)
-        serializer = StrainSerializer(strain)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        strain = StrainModel.objects.filter(strain_id=strain_id)
+        if not strain:
+            return Response({
+                'error': {
+                    'ru': 'Штамм не найден',
+                    'en': 'Strain not found'
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            serializer = StrainSerializer(strain[0])
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class AddStrainView(APIView):
     def post(self, request):
-        serializer = AddStrainSerializer(data = request.data)
+        serializer = AddStrainSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response({
-                'message':{
-                    'ru':'Штамм успешно добавлен',
-                    'en':'Strain successfully added'
+                'message': {
+                    'ru': 'Штамм успешно добавлен',
+                    'en': 'Strain successfully added'
                 },
-                'StrainID' : serializer.data['id']
-            }, status = status.HTTP_201_CREATED)
+                'strain_id': serializer.data['id']
+            }, status=status.HTTP_201_CREATED)
         else:
             return Response({
-                'error':{
+                'error': {
                     'ru': serializer.errors,
                     'en': serializer.errors
                 }
@@ -52,13 +91,16 @@ class AddStrainView(APIView):
 
 class StrainsListView(APIView):
     def get(self, request):
-        strains = Strain.objects.filter(Remarks="cat").order_by("strain_id")
+        strains = StrainModel.objects.filter(Remarks="cat").order_by("strain_id")
         serializer = PreviewStrainsSerializer(strains, many=True)
         return Response(serializer.data)
+
+
 class UploadStrainsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
+
     def post(self, request):
         if "csv_file" not in request.FILES:
             return Response({"error": "Файл не найден"}, status=status.HTTP_400_BAD_REQUEST)
@@ -73,7 +115,7 @@ class UploadStrainsView(APIView):
                 reader = csv.DictReader(file)
                 strains = []
                 for row in reader:
-                    strain = Strain(
+                    strain = StrainModel(
                         # Раздел 1 – Наименование штамма, такcономия, номенклатура, степень риска
                         CollectionCode=row.get("collectionCode", ""),
                         Subcollection=row.get("Subcollection", ""),
@@ -191,14 +233,14 @@ class UploadStrainsView(APIView):
                     strain.DegradationRus = row.get("DegradationRus", "")
                     strains.append(strain)
 
-                Strain.objects.bulk_create(strains)
+                StrainModel.objects.bulk_create(strains)
         except Exception as e:
             print(f"⚠️ Ошибка загрузки файла: {e}")
             return Response({"error": {
-                'ru':"Ошибка загрузки файла",
-                'en':"Error uploading file"}},
-            status=status.HTTP_400_BAD_REQUEST)
+                'ru': "Ошибка загрузки файла",
+                'en': "Error uploading file"}},
+                status=status.HTTP_400_BAD_REQUEST)
         return Response({"message": {
-            'ru':"Файл успешно загружен",
-            'en':"File successfully uploaded"}},
+            'ru': "Файл успешно загружен",
+            'en': "File successfully uploaded"}},
             status=status.HTTP_201_CREATED)

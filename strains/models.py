@@ -1,8 +1,8 @@
 from django.db import models
-
+from django.contrib.auth.models import User
 # Create your models here.
 
-class Strain(models.Model):
+class StrainModel(models.Model):
     strain_id = models.AutoField(primary_key=True)
 
     #Раздел 1 – Наименование штамма, такcономия, номенклатура, степень риска
@@ -121,3 +121,10 @@ class Strain(models.Model):
     DegradationRus = models.CharField(max_length = 255, blank = True)
     class Meta:
         verbose_name_plural = 'strains'
+
+class StrainModelChange(models.Model):
+    strain = models.ForeignKey(StrainModel, on_delete=models.CASCADE, related_name='changes')
+    changed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='changes')
+    changes = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

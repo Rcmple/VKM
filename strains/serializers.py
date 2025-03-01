@@ -1,14 +1,14 @@
 from rest_framework import serializers
-from .models import Strain
+from .models import StrainModel, StrainModelChange
 class AddStrainSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Strain
+        model = StrainModel
         fields = '__all__'
 
 class PreviewStrainsSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = Strain
+        model = StrainModel
         fields = ['strain_id','Genus', 'Species', 'Family', 'Class', 'Risk_group']
 
 class StrainSerializer(serializers.ModelSerializer):
@@ -34,7 +34,7 @@ class StrainSerializer(serializers.ModelSerializer):
     Degradation = serializers.SerializerMethodField()
     EnzymeProduction = serializers.SerializerMethodField()
     class Meta:
-        model = Strain
+        model = StrainModel
         exclude = [
             'TypeRus', 'TypeEng', 'ReceivedFromRus', 'ReceivedFromEng', 'DepositorRus', 'DepositorEng',
             'TypeOfSubstrateRus', 'TypeOfSubstrateEng', 'IsolatedFromRus', 'IsolatedFromEng', 'AnatomicPartRus',
