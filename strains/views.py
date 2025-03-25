@@ -1,8 +1,8 @@
 from rest_framework.views import APIView
-from .serializers import AddStrainSerializer, StrainSerializer, PreviewStrainsSerializer
+from .serializers import AddStrainSerializer, StrainSerializer, PreviewStrainSerializer, StrainChangeSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from .models import StrainModel, StrainModelChange
+from .models import StrainModel, StrainChangeModel
 import csv
 from datetime import datetime
 from django.core.files.storage import default_storage
@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+from VKMauth.permissions import IsModerator
 
 
 def parse_date(date_str):
@@ -25,10 +26,59 @@ def parse_date(date_str):
     return None
 
 
-class SuggestEditStrainView(APIView):
+class StrainsListView(APIView):
+    def get(self, request):
+        if request.user and request.user.groups.filter(name='Moderator').exists():
+            # Показываю все штаммы, так как админ
+            strains = StrainModel.objects.all().order_by("strain_id")
+            serializer = PreviewStrainSerializer(strains, many=True)
+            return Response(serializer.data)
+        elif request.user:
+            strains = StrainModel.objects.filter(Remarks__in=['cat', 'nc', 'ncat', 'dep']).order_by("strain_id")
+            serializer = PreviewStrainSerializer(strains, many=True)
+            return Response(serializer.data)
+        else:
+            # Показываю только те на которых метка "cat"
+            strains = StrainModel.objects.filter(Remarks="cat").order_by("strain_id")
+            serializer = PreviewStrainSerializer(strains, many=True)
+            return Response(serializer.data)
+
+
+class EditedStrainsListView(APIView):
+    permission_classes = [IsModerator]
+
+    def get(self, request):
+        suggestions = StrainChangeModel.objects.all()
+        serializer = StrainChangeSerializer(suggestions, many=True)
+        return Response(serializer.data)
+
+class StrainView(APIView):
+
+    def get(self, request, strain_id):
+        #Беру всю информацию о Штамме
+        try:
+            strain = StrainModel.objects.get(strain_id=strain_id)
+        except StrainModel.DoesNotExist:
+            return Response({
+                'error': {
+                    'ru': 'Штамм не найден',
+                    'en': 'Strain not found'
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+        if strain.Remarks != "cat" and not request.user:
+            return Response({
+                'error': {
+                    'ru': 'Штамм не найден',
+                    'en': 'Strain not found'
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+        serializer = StrainSerializer(strain)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class EditedStrainView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, strain_id):
+    def put(self, request, strain_id):
         try:
             strain = StrainModel.objects.get(strain_id=strain_id)
         except StrainModel.DoesNotExist:
@@ -39,7 +89,7 @@ class SuggestEditStrainView(APIView):
                 }
             }, status=status.HTTP_404_NOT_FOUND)
 
-        change = StrainModelChange.objects.create(
+        change = StrainChangeModel.objects.create(
             strain=strain,
             changes=request.data,
             changed_by=request.user
@@ -51,22 +101,6 @@ class SuggestEditStrainView(APIView):
                 'en': 'Changes successfully suggested'
             }
         }, status=status.HTTP_201_CREATED)
-
-
-class StrainInfoView(APIView):
-    def get(self, request, strain_id):
-        strain = StrainModel.objects.filter(strain_id=strain_id)
-        if not strain:
-            return Response({
-                'error': {
-                    'ru': 'Штамм не найден',
-                    'en': 'Strain not found'
-                }
-            }, status=status.HTTP_404_NOT_FOUND)
-        else:
-            serializer = StrainSerializer(strain[0])
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 class AddStrainView(APIView):
     def post(self, request):
@@ -89,13 +123,6 @@ class AddStrainView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class StrainsListView(APIView):
-    def get(self, request):
-        strains = StrainModel.objects.filter(Remarks="cat").order_by("strain_id")
-        serializer = PreviewStrainsSerializer(strains, many=True)
-        return Response(serializer.data)
-
-
 class UploadStrainsView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -116,8 +143,7 @@ class UploadStrainsView(APIView):
                 strains = []
                 for row in reader:
                     strain = StrainModel(
-                        # Раздел 1 – Наименование штамма, такcономия, номенклатура, степень риска
-                        CollectionCode=row.get("collectionCode", ""),
+                        CollectionCode=row.get("CollectionCode", ""),
                         Subcollection=row.get("Subcollection", ""),
                         Subcollection1=row.get("Subcollection1", ""),
                         Genus=row.get("Genus", ""),
@@ -128,20 +154,20 @@ class UploadStrainsView(APIView):
                         Strain=row.get("Strain", ""),
                         AuthoritySp=row.get("AuthoritySp", ""),
                         AuthoritySubSp=row.get("AuthoritySubSp", ""),
-                        Family=row.get("family", ""),
-                        Order=row.get("order", ""),
-                        Class=row.get("class", ""),
+                        Family=row.get("Family", ""),
+                        Order=row.get("Order", ""),
+                        Class=row.get("Class", ""),
                         Synonym=row.get("Synonym", ""),
-                        TaxonomicID=row.get("NameID", ""),
-                        Current_Name=row.get("CurrentName", ""),
-                        Link_to_TaxonomicID=row.get("Website", ""),
-                        Pathogenicgroup=row.get("GruppaPat", ""),
-                        Risk_group=row.get("Risk group", ""),
+                        TaxonomicID=row.get("TaxonomicID", ""),
+                        Current_Name=row.get("Current_Name", ""),
+                        Link_to_TaxonomicID=row.get("Link_to_TaxonomicID", ""),
+                        Pathogenicgroup=row.get("Pathogenicgroup", ""),
+                        Risk_group=row.get("Risk_group", ""),
                         SanPin=row.get("SanPin", ""),
                         State=row.get("State", ""),
                         TypeRus=row.get("TypeRus", ""),
                         TypeEng=row.get("TypeEng", ""),
-                        accepted_name=row.get("CurrentName", ""),
+                        Qouts=row.get("Qouts", ""),
                         OtherName=row.get("OtherName", ""),
                         ClassShort=row.get("ClassShort", ""),
                         References=row.get("References", ""),
@@ -159,8 +185,8 @@ class UploadStrainsView(APIView):
                     strain.ReceivedAs = row.get("ReceivedAs", "")
                     strain.ReceivedDate = parse_date(row.get("ReceivedDate", ""))
                     strain.AccessionDate = parse_date(row.get("AccessionDate", ""))
-                    strain.TypeOfSubstrateRus = row.get("TypeSubstrateRus", "")
-                    strain.TypeOfSubstrateEng = row.get("TypeSubstrateEng", "")
+                    strain.TypeOfSubstrateRus = row.get("TypeOfSubstrateRus", "")
+                    strain.TypeOfSubstrateEng = row.get("TypeOfSubstrateEng", "")
                     strain.IsolatedFromRus = row.get("IsolatedFromRus", "")
                     strain.IsolatedFromEng = row.get("IsolatedFromEng", "")
                     strain.AnatomicPartRus = row.get("AnatomicPartRus", "")
@@ -186,7 +212,7 @@ class UploadStrainsView(APIView):
 
                     # Раздел 3 – Культивирование и хранение штамма
                     strain.IncubationTemp = row.get("IncubationTemp", "")
-                    strain.Tested_temperature_growth_range = row.get("Tested temperature growth range", "")
+                    strain.Tested_temperature_growth_range = row.get("Tested_temperature_growth_range", "")
                     strain.GrowthMedium = row.get("GrowthMedium", "")
                     strain.GrowthConditionRus = row.get("GrowthConditionRus", "")
                     strain.GrowthConditionEng = row.get("GrowthConditionEng", "")
@@ -201,13 +227,13 @@ class UploadStrainsView(APIView):
 
                     # Раздел 4 – Характеристика штамма
                     strain.EnzymeProductionEng = row.get("EnzymeProductionEng", "")
-                    strain.MeraboliteProductionEng = row.get("MeraboliteProductionEng", "")
+                    strain.MetaboliteProductionEng = row.get("MetaboliteProductionEng", "")
                     strain.TransformationEng = row.get("TransformationEng", "")
                     strain.DegradationEng = row.get("DegradationEng", "")
                     strain.OtherRus = row.get("OtherRus", "")
                     strain.OtherEng = row.get("OtherEng", "")
                     strain.MatingType = row.get("MatingType", "")
-                    strain.DNA_Sequence_Accession_Numbers = row.get("DNASeq", "")
+                    strain.DNA_Sequence_Accession_Numbers = row.get("DNA_Sequence_Accession_Numbers", "")
 
                     # Раздел 5 – Общая информация
                     strain.Latitude = row.get("Latitude", "")
@@ -215,20 +241,20 @@ class UploadStrainsView(APIView):
                     strain.Altitude = row.get("Altitude", "")
                     strain.Curator = row.get("Curator", "")
                     strain.Category = row.get("Category", "")
-                    strain.Restrictions_on_use = row.get("Restrictions on use", "")
+                    strain.Restrictions_on_use = row.get("Restrictions_on_use", "")
                     strain.Remarks = row.get("Remarks", "")
                     strain.EntryDate = parse_date(row.get("EntryDate", ""))
                     strain.EditDate = parse_date(row.get("EditDate", ""))
                     strain.ReidentifRus = row.get("ReidentifRus", "")
                     strain.ReidentifEng = row.get("ReidentifEng", "")
-                    strain.Confidential_Information = row.get("ConfInf", "")
+                    strain.Confidential_Information = row.get("Confidential_Information", "")
                     strain.ApplicationRus = row.get("ApplicationRus", "")
                     strain.ApplicationEng = row.get("ApplicationEng", "")
-                    strain.Form_of_supply = row.get("Supply", "")
+                    strain.Form_of_supply = row.get("Form_of_supply", "")
                     strain.Report2020 = row.get("Report2020", "")
                     strain.Report2021 = row.get("Report2021", "")
                     strain.EnzymeProductionRus = row.get("EnzymeProductionRus", "")
-                    strain.MeraboliteProductionRus = row.get("MeraboliteProductionRus", "")
+                    strain.MetaboliteProductionRus = row.get("MetaboliteProductionRus", "")
                     strain.TransformationRus = row.get("TransformationRus", "")
                     strain.DegradationRus = row.get("DegradationRus", "")
                     strains.append(strain)

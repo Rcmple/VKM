@@ -3,7 +3,7 @@ from django.db.models.functions import Greatest
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from strains.models import StrainModel
-from strains.serializers import StrainSerializer
+from strains.serializers import PreviewStrainSerializer
 import re
 
 class StrainsSearchView(APIView):
@@ -42,6 +42,6 @@ class StrainsSearchView(APIView):
             ])
         ).order_by('-total_similarity')
 
-        serializer = StrainSerializer(strains, many=True)
+        serializer = PreviewStrainSerializer(strains, many=True)
         return Response(serializer.data)
 

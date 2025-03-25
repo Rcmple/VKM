@@ -7,4 +7,7 @@ urlpatterns = [
     path('status/', views.AuthStatusView.as_view(), name='AuthStatusView'),
 
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('add_user/', views.AddUserView.as_view(), name='AddUser'),
+    path('delete_user/', views.DeleteUserView.as_view(), name='DeleteUser'),
+    path('users_list/', views.UsersListView.as_view(), name='UsersList'),
 ]
