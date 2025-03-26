@@ -10,7 +10,7 @@ class Section1Serializer(serializers.ModelSerializer):
         fields = [
             'CollectionCode', 'Subcollection', 'Subcollection1', 'Genus', 'Species', 'Variant',
             'Forma', 'FormaSpecies', 'Strain', 'AuthoritySp', 'AuthoritySubSp', 'Family',
-            'Order', 'Class', 'Synonym', 'TaxonomicID', 'Current_Name', 'Link_to_TaxonomicID',
+            'Order', 'Class', 'Synonym', 'TaxonomicID', 'Current_Name_DSMZ_MycoBank', 'Link_to_TaxonomicID',
             'Pathogenicgroup', 'Risk_group', 'SanPin', 'State', 'Type', 'Qouts',
             'OtherName', 'ClassShort', 'References', 'References_nc', 'Race', 'Serovar', 'OtherCol'
         ]
@@ -148,12 +148,12 @@ class Section5Serializer(serializers.ModelSerializer):
     def get_Application(self, obj):
         return {'en': obj.ApplicationEng, 'ru': obj.ApplicationRus}
 
-class PreviewSectionSerializer(serializers.ModelSerializer):
+class PreviewStrainSerializer(serializers.ModelSerializer):
     TypeOfSubstrate = serializers.SerializerMethodField()
     Country = serializers.SerializerMethodField()
     class Meta:
         model = StrainModel
-        fields = ['CollectionCode', 'Strain', 'Genus', 'Species', 'Variant', 'AuthoritySp', 'TypeOfSubstrate', 'Country', 'IsolationDate']
+        fields = ['strain_id', 'CollectionCode', 'Strain', 'Genus', 'Species', 'Variant', 'AuthoritySp', 'TypeOfSubstrate', 'Country', 'IsolationDate']
 
     def get_TypeOfSubstrate(self, obj):
         return {
@@ -180,12 +180,6 @@ class AddStrainSerializer(serializers.ModelSerializer):
         model = StrainModel
         fields = '__all__'
 
-class PreviewStrainSerializer(serializers.ModelSerializer):
-    PreviewSection = PreviewSectionSerializer(read_only=True)
-    class Meta:
-        model = StrainModel
-        fields = ['strain_id', 'PreviewSection']
-
 class StrainChangeSerializer(serializers.ModelSerializer):
     strain = PreviewStrainSerializer(read_only=True)
     changed_by = UserSerializer(read_only=True)
@@ -194,12 +188,33 @@ class StrainChangeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class StrainSerializer(serializers.ModelSerializer):
-    Section1 = Section1Serializer(read_only=True)
-    Section2 = Section2Serializer(read_only=True)
-    Section3 = Section3Serializer(read_only=True)
-    Section4 = Section4Serializer(read_only=True)
-    Section5 = Section5Serializer(read_only=True)
+    NameAndTaxonomy = serializers.SerializerMethodField()  # Раздел 1
+    History = serializers.SerializerMethodField()  # Раздел 2
+    CultivationAndStorage = serializers.SerializerMethodField()  # Раздел 3
+    StrainCharacteristics = serializers.SerializerMethodField()  # Раздел 4
+    GeneralInformation = serializers.SerializerMethodField()  # Раздел 5
+
     class Meta:
         model = StrainModel
-        fields = ['strain_id', 'Section1', 'Section2', 'Section3', 'Section4', 'Section5']
+        fields = [
+            'strain_id', 'NameAndTaxonomy', 'History', 'CultivationAndStorage',
+            'StrainCharacteristics', 'GeneralInformation'
+        ]
+
+    def get_NameAndTaxonomy(self, obj):
+        return Section1Serializer(obj, many=False).data
+
+    def get_History(self, obj):
+        return Section2Serializer(obj, many=False).data
+
+    def get_CultivationAndStorage(self, obj):
+        return Section3Serializer(obj, many=False).data
+
+    def get_StrainCharacteristics(self, obj):
+        return Section4Serializer(obj, many=False).data
+
+    def get_GeneralInformation(self, obj):
+        return Section5Serializer(obj, many=False).data
+
+
 

@@ -36,6 +36,7 @@ class StrainsListView(APIView):
         elif request.user:
             strains = StrainModel.objects.filter(Remarks__in=['cat', 'nc', 'ncat', 'dep']).order_by("strain_id")
             serializer = PreviewStrainSerializer(strains, many=True)
+            print(serializer.data)
             return Response(serializer.data)
         else:
             # Показываю только те на которых метка "cat"
@@ -124,7 +125,6 @@ class AddStrainView(APIView):
 
 
 class UploadStrainsView(APIView):
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -159,7 +159,7 @@ class UploadStrainsView(APIView):
                         Class=row.get("Class", ""),
                         Synonym=row.get("Synonym", ""),
                         TaxonomicID=row.get("TaxonomicID", ""),
-                        Current_Name=row.get("Current_Name", ""),
+                        Current_Name_DSMZ_MycoBank=row.get("Current_Name", ""),
                         Link_to_TaxonomicID=row.get("Link_to_TaxonomicID", ""),
                         Pathogenicgroup=row.get("Pathogenicgroup", ""),
                         Risk_group=row.get("Risk_group", ""),
