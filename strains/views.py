@@ -1,16 +1,17 @@
 from rest_framework.views import APIView
-from .serializers import AddStrainSerializer, StrainSerializer, PreviewStrainSerializer, StrainChangeSerializer
+from .serializers import (StrainNewRequestSerializer,
+                          StrainSerializer, PreviewStrainSerializer,
+                          StrainChangeRequestSerializer)
 from rest_framework.response import Response
 from rest_framework import status
-from .models import StrainModel, StrainChangeModel
+from .models import StrainModel, StrainChangeRequestModel, StrainNewRequestModel
 import csv
 from datetime import datetime
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from VKMauth.permissions import IsModerator
+from rest_framework.pagination import LimitOffsetPagination
 
 
 def parse_date(date_str):
@@ -25,35 +26,27 @@ def parse_date(date_str):
             continue
     return None
 
-
+class StrainsListPagination(LimitOffsetPagination):
+    default_limit = 10
+    max_limit = 100
 class StrainsListView(APIView):
+    pagination_class = StrainsListPagination
+
     def get(self, request):
         if request.user and request.user.groups.filter(name='Moderator').exists():
-            # Показываю все штаммы, так как админ
             strains = StrainModel.objects.all().order_by("strain_id")
-            serializer = PreviewStrainSerializer(strains, many=True)
-            return Response(serializer.data)
         elif request.user:
             strains = StrainModel.objects.filter(Remarks__in=['cat', 'nc', 'ncat', 'dep']).order_by("strain_id")
-            serializer = PreviewStrainSerializer(strains, many=True)
-            print(serializer.data)
-            return Response(serializer.data)
         else:
-            # Показываю только те на которых метка "cat"
             strains = StrainModel.objects.filter(Remarks="cat").order_by("strain_id")
-            serializer = PreviewStrainSerializer(strains, many=True)
-            return Response(serializer.data)
 
+        paginator = self.pagination_class()
+        result_page = paginator.paginate_queryset(strains, request)
+        serializer = PreviewStrainSerializer(result_page, many=True)
 
-class EditedStrainsListView(APIView):
-    permission_classes = [IsModerator]
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def get(self, request):
-        suggestions = StrainChangeModel.objects.all()
-        serializer = StrainChangeSerializer(suggestions, many=True)
-        return Response(serializer.data)
-
-class StrainView(APIView):
+class StrainInfoView(APIView):
 
     def get(self, request, strain_id):
         #Беру всю информацию о Штамме
@@ -76,55 +69,104 @@ class StrainView(APIView):
         serializer = StrainSerializer(strain)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class EditedStrainView(APIView):
+class StrainChangeRequestView(APIView):
     permission_classes = [IsAuthenticated]
+    #это чтобы добавлять измененные в отедльную модель с измененями
+    def post(self, request, strain_id):
+        serializer = StrainChangeRequestSerializer(data={
+            'strain': strain_id,
+            'changed_by': request.user.id,
+            'changes': request.data.get('changes')
+        })
 
-    def put(self, request, strain_id):
-        try:
-            strain = StrainModel.objects.get(strain_id=strain_id)
-        except StrainModel.DoesNotExist:
-            return Response({
-                'error': {
-                    'ru': 'Штамм не найден',
-                    'en': 'Strain not found'
-                }
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        change = StrainChangeModel.objects.create(
-            strain=strain,
-            changes=request.data,
-            changed_by=request.user
-        )
-
-        return Response({
-            'message': {
-                'ru': 'Изменения успешно предложены',
-                'en': 'Changes successfully suggested'
-            }
-        }, status=status.HTTP_201_CREATED)
-
-class AddStrainView(APIView):
-    def post(self, request):
-        serializer = AddStrainSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({
-                'message': {
-                    'ru': 'Штамм успешно добавлен',
-                    'en': 'Strain successfully added'
-                },
-                'strain_id': serializer.data['id']
-            }, status=status.HTTP_201_CREATED)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    #это чтобы одобрить изменения и применить их в главной модели
+    def put(self, request, strain_id):
+        if not request.user.groups.filter(name='Moderator').exists():
             return Response({
                 'error': {
-                    'ru': serializer.errors,
-                    'en': serializer.errors
+                    'en' : 'You do not have permission to approve change requests',
+                    'ru' : 'У вас нет прав на одобрение запросов на изменение'
+                }}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            strain_change_request = StrainChangeRequestModel.objects.get(id=request.data.get('change_request_id'),
+                                                                         strain_id=strain_id)
+        except StrainChangeRequestModel.DoesNotExist:
+            return Response({
+                'error': {
+                    'en' : 'Change request not found or does not belong to the given strain',
+                    'ru' : 'Запрос на изменение не найден или не принадлежит данному штамму'
+                }}, status=status.HTTP_404_NOT_FOUND)
+
+        if strain_change_request.approved:
+            return Response({
+                'error': {
+                    'en' : 'This change request has already been approved.',
+                    'ru' : 'Этот запрос на изменение уже был одобрен.'
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        strain = strain_change_request.strain
 
-class UploadStrainsView(APIView):
+        for field, value in strain_change_request.changes.items():
+            if hasattr(strain, field):
+                setattr(strain, field, value)
+
+        strain.save()
+
+        strain_change_request.approved = True
+        strain_change_request.save()
+
+        return Response({
+            'message': {
+                'en:' : 'Change request approved and changes applied to StrainModel',
+                'ru' : 'Запрос на изменение одобрен и изменения применены к StrainModel'
+            }}, status=status.HTTP_200_OK)
+
+class StrainNewRequestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = StrainNewRequestSerializer(data={
+            'created_by': request.user.id,
+            'changes': request.data.get('changes')
+        })
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request):
+        try:
+            strain_new_request = StrainNewRequestModel.objects.get(id=request.data.get('new_request_id'))
+        except StrainNewRequestModel.DoesNotExist:
+            return Response({
+                'error': 'New request not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        if strain_new_request.approved:
+            return Response({
+                'error': 'This new request has already been approved.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        strain = StrainModel.objects.create(**strain_new_request.changes)
+        strain.save()
+
+        strain_new_request.approved = True
+        strain_new_request.save()
+
+        return Response({
+            'message': 'New request approved and new strain created'
+        }, status=status.HTTP_200_OK)
+
+
+class StrainsUploadRequestView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 

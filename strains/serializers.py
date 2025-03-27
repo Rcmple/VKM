@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import StrainModel, StrainChangeModel
+from .models import StrainModel, StrainNewRequestModel, StrainChangeRequestModel
 from VKMauth.serializers import UserSerializer
 
 class Section1Serializer(serializers.ModelSerializer):
@@ -174,19 +174,6 @@ class PreviewStrainSerializer(serializers.ModelSerializer):
             return obj.ReceivedDate
         else:
             return None
-
-class AddStrainSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StrainModel
-        fields = '__all__'
-
-class StrainChangeSerializer(serializers.ModelSerializer):
-    strain = PreviewStrainSerializer(read_only=True)
-    changed_by = UserSerializer(read_only=True)
-    class Meta:
-        model = StrainChangeModel
-        fields = '__all__'
-
 class StrainSerializer(serializers.ModelSerializer):
     NameAndTaxonomy = serializers.SerializerMethodField()  # Раздел 1
     History = serializers.SerializerMethodField()  # Раздел 2
@@ -215,6 +202,92 @@ class StrainSerializer(serializers.ModelSerializer):
 
     def get_GeneralInformation(self, obj):
         return Section5Serializer(obj, many=False).data
+
+
+class StrainChangeRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StrainChangeRequestModel
+        fields = '__all__'
+
+    def validate_changes(self, value):
+        strain_fields = [field.name for field in StrainModel._meta.fields]
+
+        invalid_fields = [field for field in value.keys() if field not in strain_fields]
+        if invalid_fields:
+            raise serializers.ValidationError(f"Неверные поля: {', '.join(invalid_fields)}")
+
+        for field, field_value in value.items():
+            model_field = StrainModel._meta.get_field(field)
+
+            if isinstance(field_value, str) and model_field.get_internal_type() != 'CharField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть строкой.")
+            if isinstance(field_value, int) and model_field.get_internal_type() != 'IntegerField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть целым числом.")
+            if isinstance(field_value, float) and model_field.get_internal_type() != 'FloatField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть числом с плавающей точкой.")
+            if isinstance(field_value, bool) and model_field.get_internal_type() != 'BooleanField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть булевым значением.")
+
+            if isinstance(field_value, str) and model_field.get_internal_type() == 'DateField':
+                try:
+                    from datetime import datetime
+                    datetime.strptime(field_value, '%Y-%m-%d')
+                except ValueError:
+                    raise serializers.ValidationError(f"Поле '{field}' должно быть в формате даты 'YYYY-MM-DD'.")
+
+        return value
+
+
+class StrainNewRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StrainNewRequestModel
+        fields = '__all__'
+
+    def validate_changes(self, value):
+        required_fields = [
+            'CollectionCode', 'Subcollection', 'Subcollection1', 'Genus', 'Species',
+            'Strain', 'AuthoritySp', 'ReceivedFromRus', 'ReceivedFromEng',
+            'ReceivedAs', 'ReceivedDate', 'TypeOfSubstrateRus', 'TypeOfSubstrateEng',
+            'IsolatedFromRus', 'IsolatedFromEng', 'IncubationTemp', 'GrowthMedium',
+            'StorageMethods', 'Curator', 'Remarks', 'EntryDate', 'EditDate'
+        ]
+
+        for field in required_fields:
+            if field not in value or not value[field]:
+                raise serializers.ValidationError(f"Поле '{field}' обязательно для заполнения.")
+
+        if 'Species' in value and value['Species'] == 'sp.':
+            if 'AuthoritySp' in value and value['AuthoritySp']:
+                raise serializers.ValidationError(
+                    "Поле 'AuthoritySp' не должно быть заполнено, если в поле 'Species' указано 'sp.'")
+
+        strain_fields = [field.name for field in StrainModel._meta.fields]
+        invalid_fields = [field for field in value.keys() if field not in strain_fields]
+
+        if invalid_fields:
+            raise serializers.ValidationError(f"Неверные поля: {', '.join(invalid_fields)}")
+
+        for field, field_value in value.items():
+            model_field = StrainModel._meta.get_field(field)
+
+            if isinstance(field_value, str) and model_field.get_internal_type() != 'CharField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть строкой.")
+            if isinstance(field_value, int) and model_field.get_internal_type() != 'IntegerField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть целым числом.")
+            if isinstance(field_value, float) and model_field.get_internal_type() != 'FloatField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть числом с плавающей точкой.")
+            if isinstance(field_value, bool) and model_field.get_internal_type() != 'BooleanField':
+                raise serializers.ValidationError(f"Поле '{field}' должно быть булевым значением.")
+
+            if isinstance(field_value, str) and model_field.get_internal_type() == 'DateField':
+                try:
+                    from datetime import datetime
+                    datetime.strptime(field_value, '%Y-%m-%d')
+                except ValueError:
+                    raise serializers.ValidationError(f"Поле '{field}' должно быть в формате даты 'YYYY-MM-DD'.")
+
+        return value
+
 
 
 

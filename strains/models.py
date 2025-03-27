@@ -125,9 +125,17 @@ class StrainModel(models.Model):
     class Meta:
         verbose_name_plural = 'strains'
 
-class StrainChangeModel(models.Model):
+class StrainChangeRequestModel(models.Model):
     strain = models.ForeignKey(StrainModel, on_delete=models.CASCADE, related_name='changes')
     changed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='changes')
     changes = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    approved = models.BooleanField(default=False)
+
+class StrainNewRequestModel(models.Model):
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='new')
+    changes = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    approved = models.BooleanField(default=False)
