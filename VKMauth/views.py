@@ -8,16 +8,22 @@ from .serializers import UserSerializer, LoginSerializer, AddUserSerializer
 from .permissions import IsModerator
 from django.contrib.auth.models import User
 
+
 class AuthStatusView(APIView):
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        if user.groups.filter(name='Moderator').exists():
-            return Response({"isAuthenticated": True, "username": request.user.username, "isModerator": True})
-        return Response({"isAuthenticated": True, "username": request.user.username, "isModerator": False})
+        if not user.is_authenticated:
+            return Response({"isAuthenticated": False, "user": None})
+        else:
+            user = User.objects.get(username=user.username)
+            user_data = UserSerializer(user).data
+            return Response({"isAuthenticated": True, "user": user_data})
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
+
     def post(self, request):
         if request.user.is_authenticated:
             return Response({
@@ -26,31 +32,89 @@ class LoginView(APIView):
                     'en': 'You are already authorized'
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
-            user = authenticate(username = username, password = password)
+            user = authenticate(username=username, password=password)
             if user:
                 login(request, user)
+
+                user_serializer = UserSerializer(user)
+                user_data = user_serializer.data
                 refresh = RefreshToken.for_user(user)
 
                 return Response({
                     'access': str(refresh.access_token),
                     'refresh': str(refresh),
-                    'user': UserSerializer(user).data
-                })
+                    'user': user_data,
+                }, status=status.HTTP_200_OK)
             else:
                 return Response({
-                        'error':{
-                            'ru':'Пользователь не найден, возможно вы ввели неверный логин или пароль',
-                            'en':'User not found, maybe you entered an incorrect username or password.'
-                        }
-                    },
-                    status = status.HTTP_400_BAD_REQUEST
+                    'error': {
+                        'ru': 'Пользователь не найден, возможно вы ввели неверный логин или пароль',
+                        'en': 'User not found, maybe you entered an incorrect username or password.'
+                    }
+                },
+                    status=status.HTTP_400_BAD_REQUEST
                 )
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logout(request)
+        return Response({'message': {
+            'ru': 'Вы вышли из системы',
+            'en': 'You have logged out'
+        }}, status=status.HTTP_200_OK)
+
+
+class AddUserView(APIView):
+    permission_classes = [IsModerator]
+
+    def post(self, request):
+        serializer = AddUserSerializer(data=request.data)
+        if serializer.is_valid():
+            user = User.objects.create_user(
+                username=serializer.validated_data['username'],
+                password=serializer.validated_data['password'],
+                email=serializer.validated_data.get('email'),
+                first_name=serializer.validated_data.get('first_name'),
+                last_name=serializer.validated_data.get('last_name')
+            )
+            if serializer.isModerator:
+                user.groups.add('Moderator')
+
+            return Response({"message": {
+                "ru": "Пользователь успешно зарегистрирован",
+                "en": "User successfully registered"
+            }},
+                status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteUserView(APIView):
+    permission_classes = [IsModerator]
+
+    def post(self, request):
+        user = User.objects.get(id=request.data.get('user_id'))
+        if user:
+            user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({
+                'error': {
+                    'ru': 'Пользователь не найден',
+                    'en': 'User not found'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UsersListView(APIView):
     permission_classes = [IsModerator]
@@ -60,47 +124,23 @@ class UsersListView(APIView):
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
-class AddUserView(APIView):
+
+class ChangeUserPasswordView(APIView):
     permission_classes = [IsModerator]
 
     def post(self, request):
-        serializer = AddUserSerializer(data=request.data)
-        if serializer.is_valid():
-            User.objects.create_user(
-                username=serializer.validated_data['username'],
-                password=serializer.validated_data['password'],
-                email=serializer.validated_data.get('email')
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        user = User.objects.get(username=request.data.get('user').get('username'))
+        if user:
+            user.set_password(request.data.get('user').get('new_password'))
+            user.save()
+            return Response({"message":{
+                "ru": "Пароль успешно изменен",
+                "en": "Password successfully changed"
+            }}, status=status.HTTP_204_NO_CONTENT)
         else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        logout(request)
-        return Response({"message": {
-                'ru' : "Вы успешно вышли",
-                'en' : "You have successfully logged out"
-            }
-        }, status=status.HTTP_200_OK)
-class DeleteUserView(APIView):
-    permission_classes = [IsModerator]
-
-    def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                user = User.objects.get(username=serializer.validated_data['username'])
-                user.delete()
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            except User.DoesNotExist:
-                return Response({
-                    'error': {
-                        'ru': 'Пользователь не найден',
-                        'en': 'User not found'
-                    }
-                }, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': {
+                    'ru': 'Пользователь не найден',
+                    'en': 'User not found'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
