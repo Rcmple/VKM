@@ -205,6 +205,8 @@ class StrainSerializer(serializers.ModelSerializer):
 
 
 class StrainChangeRequestSerializer(serializers.ModelSerializer):
+    strain = PreviewStrainSerializer(read_only=True)
+    changed_by = UserSerializer(read_only=True)
     class Meta:
         model = StrainChangeRequestModel
         fields = '__all__'
@@ -239,6 +241,7 @@ class StrainChangeRequestSerializer(serializers.ModelSerializer):
 
 
 class StrainNewRequestSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
     class Meta:
         model = StrainNewRequestModel
         fields = '__all__'
@@ -246,10 +249,10 @@ class StrainNewRequestSerializer(serializers.ModelSerializer):
     def validate_changes(self, value):
         required_fields = [
             'CollectionCode', 'Subcollection', 'Subcollection1', 'Genus', 'Species',
-            'Strain', 'AuthoritySp', 'ReceivedFromRus', 'ReceivedFromEng',
+            'Strain', 'ReceivedFromRus', 'ReceivedFromEng',
             'ReceivedAs', 'ReceivedDate', 'TypeOfSubstrateRus', 'TypeOfSubstrateEng',
             'IsolatedFromRus', 'IsolatedFromEng', 'IncubationTemp', 'GrowthMedium',
-            'StorageMethods', 'Curator', 'Remarks', 'EntryDate', 'EditDate'
+            'StorageMethods', 'Curator', 'Remakes', 'EntryDate', 'EditDate'
         ]
 
         for field in required_fields:

@@ -12,6 +12,7 @@ from django.core.files.base import ContentFile
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
+from VKMauth.permissions import IsModerator
 
 
 def parse_date(date_str):
@@ -29,6 +30,7 @@ def parse_date(date_str):
 class StrainsListPagination(LimitOffsetPagination):
     default_limit = 10
     max_limit = 100
+
 class StrainsListView(APIView):
     pagination_class = StrainsListPagination
 
@@ -44,10 +46,27 @@ class StrainsListView(APIView):
         result_page = paginator.paginate_queryset(strains, request)
         serializer = PreviewStrainSerializer(result_page, many=True)
 
+        return paginator.get_paginated_response(serializer.data)
+
+class StrainChangeRequestListView(APIView):
+    permission_classes = [IsModerator]
+    pagination_class = StrainsListPagination
+    def get(self, request):
+        change_requests = StrainChangeRequestModel.objects.all()
+        paginator = self.pagination_class()
+        result_page = paginator.paginate_queryset(change_requests, request)
+        serializer = StrainChangeRequestSerializer(result_page, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
+
+class StrainNewRequestListView(APIView):
+    permission_classes = [IsModerator]
+    def get(self, request):
+        new_requests = StrainNewRequestModel.objects.all()
+        serializer = StrainNewRequestSerializer(new_requests, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class StrainInfoView(APIView):
-
     def get(self, request, strain_id):
         #Беру всю информацию о Штамме
         try:
@@ -71,7 +90,7 @@ class StrainInfoView(APIView):
 
 class StrainChangeRequestView(APIView):
     permission_classes = [IsAuthenticated]
-    #это чтобы добавлять измененные в отедльную модель с измененями
+    #это чтобы добавлять измененные в отдельную модель с измененями
     def post(self, request, strain_id):
         serializer = StrainChangeRequestSerializer(data={
             'strain': strain_id,
@@ -147,12 +166,18 @@ class StrainNewRequestView(APIView):
             strain_new_request = StrainNewRequestModel.objects.get(id=request.data.get('new_request_id'))
         except StrainNewRequestModel.DoesNotExist:
             return Response({
-                'error': 'New request not found'
+                "error": {
+                "ru": "Запрос на добавление не найден или не принадлежит данному штамму",
+                "en": "Add request not found or does not belong to this strain"
+                }
             }, status=status.HTTP_404_NOT_FOUND)
 
         if strain_new_request.approved:
             return Response({
-                'error': 'This new request has already been approved.'
+                "error": {
+                "ru": "Этот запрос на добавление уже был одобрен",
+                "en": "This add request has already been approved"
+             }
             }, status=status.HTTP_400_BAD_REQUEST)
 
         strain = StrainModel.objects.create(**strain_new_request.changes)
@@ -162,7 +187,10 @@ class StrainNewRequestView(APIView):
         strain_new_request.save()
 
         return Response({
-            'message': 'New request approved and new strain created'
+            "message": {
+                "ru": "Запрос на добавление одобрен и новый штамм добавлен в StrainModel",
+                "en": "Add request approved and new strain added to StrainModel"
+            }
         }, status=status.HTTP_200_OK)
 
 
