@@ -61,10 +61,13 @@ class StrainChangeRequestListView(APIView):
 
 class StrainNewRequestListView(APIView):
     permission_classes = [IsModerator]
+    pagination_class = StrainsListPagination
     def get(self, request):
         new_requests = StrainNewRequestModel.objects.all()
-        serializer = StrainNewRequestSerializer(new_requests, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        paginator = self.pagination_class()
+        result_page = paginator.paginate_queryset(new_requests, request)
+        serializer = StrainNewRequestSerializer(result_page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 class StrainInfoView(APIView):
     def get(self, request, strain_id):
