@@ -329,7 +329,7 @@
              "changes": {
               "field_name": "value",
               "field_name2": "value2"
-              // и так далее,
+              // и так далее
             }
         }
         ```
