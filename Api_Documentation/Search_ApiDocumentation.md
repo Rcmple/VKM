@@ -1,59 +1,80 @@
+
 ## 4. Search (Поиск)
-### **`[GET] /api/strains/search/`** – *Поиск штаммов по названию рода (Genus) и виду (Species)*
+
+### **`[POST] /api/strains/search/`** – *Расширенный поиск штаммов по различным полям*
 
 - **Описание:**  
-  Этот эндпоинт позволяет выполнять полнотекстовый поиск штаммов по полям `Strain`, `Genus` и `Species` с использованием триграммного сравнения. Запрос может содержать несколько слов (разделённых пробелами), и будет выполнен приблизительный поиск по каждому слову. Результаты сортируются по степени схожести.
+  Этот эндпоинт позволяет выполнять гибкий и точный поиск штаммов по следующим полям:
 
-- **Параметры запроса:**
-  - `q` (обязательный) – поисковая строка (может содержать одно или несколько слов).
-  - `offset` (необязательный, по умолчанию 0) – Начальная позиция для пагинации.
-  - `limit` (необязательный, по умолчанию 100) – Количество результатов на странице.
+  - `Strain` — номер штамма
+  - `TaxonName` — полнотекстовый поиск по таксономическому названию
+  - `StatusOfStrain` — фильтрация по статусу штамма
+  - `OtherCol` — поиск по другим коллекциям
+  - `IsolatedFrom` — полнотекстовый поиск по источнику выделения
+  - `Geographics` — полнотекстовый поиск по географическим данным
+  - `Country` — полнотекстовый поиск по стране
+  - `Any` — полнотекстовый поиск по всем полям
 
-- **Ответ (успешный запрос, HTTP_200_OK):**
-```json
-      {
-        "count": 100,
-        "next": "string",
-        "previous": "string",
-        "results": [
-          {
-            "strain_id": 1,
-            "CollectionCode": "string",
-            "Strain": "string",
-            "Genus": "string",
-            "Species": "string",
-            "Variant": "string",
-            "AuthoritySp": "string",
-            "TypeOfSubstrate": {
-              "en": "string",
-              "ru": "string"
-            },
-            "Country": {
-              "en": "string",
-              "ru": "string"
-            },
-            "IsolationDate": "string"
-          }
-          
-            // ... другие штаммы
-        ]
-      }
-```
+- **Формат запроса:**
 
-- **Ответ (ошибка – отсутствует параметр `q`, HTTP_400_BAD_REQUEST):**
   ```json
   {
-    "error": {
-      "ru": "Параметр q не найден",
-      "en": "Parameter q not found"
+    "query": {
+      "Strain": "5075",
+      "TaxonName": "Sarcopodium vanillae",
+      "StatusOfStrain": "type",
+      "OtherCol": "CBS 12345",
+      "IsolatedFrom": "forest litter",
+      "Geographics": "southern Vietnam",
+      "Country": "Vietnam",
+      "Any": "vanillae Vietnam forest"
     }
   }
   ```
 
-- **Ответ (ошибка – пустой или некорректный запрос, HTTP_400_BAD_REQUEST):**
+- **Параметры пагинации (в query-параметрах URL):**
+  - `offset` – начальная позиция (по умолчанию 0)
+  - `limit` – количество результатов (по умолчанию 100)
+
+- **Ответ (успешный запрос, HTTP 200 OK):**
   ```json
   {
-    "error": "Введите корректный запрос"
+    "count": 100,
+    "next": "http://example.com/api/strains/search/?offset=100&limit=100",
+    "previous": null,
+    "results": [
+      {
+        "strain_id": 41867,
+        "VKM_number": {
+          "CollectionCode": "VKM",
+          "Subcollection": "F",
+          "Strain": 5075.0
+        },
+        "Genus": "Sarcopodium",
+        "Species": "vanillae",
+        "Variant": "",
+        "AuthoritySp": "(Petch) B. Sutton 1981",
+        "TypeOfSubstrate": {
+          "en": "plant detritus",
+          "ru": "растительные остатки"
+        },
+        "Country": {
+          "en": "Vietnam",
+          "ru": "Вьетнам"
+        },
+        "IsolationDate": "2022-07-12"
+      }
+    ]
+  }
+  ```
+
+- **Ответ (ошибка – отсутствует поле `query`, HTTP 400 BAD REQUEST):**
+  ```json
+  {
+    "error": {
+      "en": "Query parameter is required",
+      "ru": "Параметр запроса обязателен"
+    }
   }
   ```
 
