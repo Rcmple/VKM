@@ -15,7 +15,6 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 # Application definition
 INSTALLED_APPS = [
     'rest_framework',
-    'drf_spectacular',
     'search',
     'corsheaders',
     'strains',
@@ -38,7 +37,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 SIMPLE_JWT = {
@@ -55,7 +53,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -65,13 +62,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Новый порт Vite
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-]
 
 CORS_ALLOW_HEADERS = [
     'Content-Type',
-    'X-CSRFToken',
     'Authorization',
 ]
 
@@ -135,9 +128,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-STATICFILES_DIRS = [
-    #os.path.join(BASE_DIR, 'static'),
-]
+
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
