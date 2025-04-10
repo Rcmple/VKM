@@ -1,17 +1,20 @@
 from rest_framework import serializers
 from .models import StrainModel, StrainNewRequestModel, StrainChangeRequestModel
 from VKMauth.serializers import UserSerializer
+from strains.fields_validate import try_validate_changes
+
 
 class Section1Serializer(serializers.ModelSerializer):
     Type = serializers.SerializerMethodField()
+    VKM_number = serializers.SerializerMethodField()
 
     class Meta:
         model = StrainModel
         fields = [
-            'CollectionCode', 'Subcollection', 'Subcollection1', 'Genus', 'Species', 'Variant',
-            'Forma', 'FormaSpecies', 'Strain', 'AuthoritySp', 'AuthoritySubSp', 'Family',
-            'Order', 'Class', 'Synonym', 'TaxonomicID', 'Current_Name_DSMZ_MycoBank', 'Link_to_TaxonomicID',
-            'Pathogenicgroup', 'Risk_group', 'SanPin', 'State', 'Type', 'Qouts',
+            'VKM_number', 'Subcollection1', 'Genus', 'Species', 'Variant',
+            'Forma', 'FormaSpecies', 'AuthoritySp', 'AuthoritySubSp', 'Family',
+            'Order', 'Class', 'Synonym', 'TaxonomicID', 'CurrentName', 'Link_to_TaxonomicID',
+            'Pathogenicgroup', 'RiskGroup', 'SanPin', 'State', 'Type', 'Qouts',
             'OtherName', 'ClassShort', 'References', 'References_nc', 'Race', 'Serovar', 'OtherCol'
         ]
 
@@ -20,6 +23,24 @@ class Section1Serializer(serializers.ModelSerializer):
             'en': obj.TypeEng,
             'ru': obj.TypeRus
         }
+
+    def get_VKM_number(self, obj):
+        return {
+            'CollectionCode': obj.CollectionCode,
+            'Subcollection': obj.Subcollection,
+            'Strain': obj.Strain,
+        }
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        user = self.context.get('user')
+        if not user.is_authenticated:
+            fields_to_remove = ['Subcollection1', 'Forma', 'FormaSpecies', 'AuthoritySubSp', 'Synonym', 'State',
+                                'Qouts', 'OtherName', 'ClassShort', 'References_nc', 'Race', 'Serovar']
+            for field in fields_to_remove:
+                representation.pop(field, None)
+
+        return representation
 
 
 class Section2Serializer(serializers.ModelSerializer):
@@ -81,6 +102,17 @@ class Section2Serializer(serializers.ModelSerializer):
     def get_IdentificateBy(self, obj):
         return {'en': obj.IdentificateByEng, 'ru': obj.IdentificateByRus}
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        user = self.context.get('user')
+        if not user.is_authenticated:
+            fields_to_remove = ['Depositor', 'AccessionDate', 'USSR', 'CollectedBy', 'CollectedDate',
+                                'IsolatedBy', 'IdentificateBy', 'IdentificateDate']
+            for field in fields_to_remove:
+                representation.pop(field, None)
+        return representation
+
+
 class Section3Serializer(serializers.ModelSerializer):
     GrowthCondition = serializers.SerializerMethodField()
 
@@ -98,6 +130,18 @@ class Section3Serializer(serializers.ModelSerializer):
             'en': obj.GrowthConditionEng,
             'ru': obj.GrowthConditionRus
         }
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        user = self.context.get('user')
+        if not user.is_authenticated:
+            fields_to_remove = ['Tested_temperature_growth_range', 'StorageMethods', 'StorageFreeze',
+                                'StorageOil', 'StorageSilicagel', 'StorageWater', 'StorageNitrogen',
+                                'StorageSubcultivation', 'StorageSoil']
+            for field in fields_to_remove:
+                representation.pop(field, None)
+        return representation
+
 
 class Section4Serializer(serializers.ModelSerializer):
     EnzymeProduction = serializers.SerializerMethodField()
@@ -128,6 +172,15 @@ class Section4Serializer(serializers.ModelSerializer):
     def get_Other(self, obj):
         return {'en': obj.OtherEng, 'ru': obj.OtherRus}
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        user = self.context.get('user')
+        if not user.is_authenticated:
+            fields_to_remove = ['Other', 'MatingType']
+            for field in fields_to_remove:
+                representation.pop(field, None)
+        return representation
+
 
 class Section5Serializer(serializers.ModelSerializer):
     Reidentif = serializers.SerializerMethodField()
@@ -148,12 +201,23 @@ class Section5Serializer(serializers.ModelSerializer):
     def get_Application(self, obj):
         return {'en': obj.ApplicationEng, 'ru': obj.ApplicationRus}
 
+
 class PreviewStrainSerializer(serializers.ModelSerializer):
     TypeOfSubstrate = serializers.SerializerMethodField()
     Country = serializers.SerializerMethodField()
+    VKM_number = serializers.SerializerMethodField()
+
     class Meta:
         model = StrainModel
-        fields = ['strain_id', 'CollectionCode', 'Strain', 'Genus', 'Species', 'Variant', 'AuthoritySp', 'TypeOfSubstrate', 'Country', 'IsolationDate']
+        fields = ['strain_id', 'VKM_number', 'Genus', 'Species', 'Variant', 'AuthoritySp',
+                  'TypeOfSubstrate', 'Country', 'IsolationDate']
+
+    def get_VKM_number(self, obj):
+        return {
+            'CollectionCode': obj.CollectionCode,
+            'Subcollection': obj.Subcollection,
+            'Strain': obj.Strain,
+        }
 
     def get_TypeOfSubstrate(self, obj):
         return {
@@ -174,6 +238,8 @@ class PreviewStrainSerializer(serializers.ModelSerializer):
             return obj.ReceivedDate
         else:
             return None
+
+
 class StrainSerializer(serializers.ModelSerializer):
     NameAndTaxonomy = serializers.SerializerMethodField()  # Раздел 1
     History = serializers.SerializerMethodField()  # Раздел 2
@@ -189,108 +255,77 @@ class StrainSerializer(serializers.ModelSerializer):
         ]
 
     def get_NameAndTaxonomy(self, obj):
-        return Section1Serializer(obj, many=False).data
+        user = self.context.get('user')
+        return Section1Serializer(obj, many=False, context={'user': user}).data
 
     def get_History(self, obj):
-        return Section2Serializer(obj, many=False).data
+        user = self.context.get('user')
+        return Section2Serializer(obj, many=False, context={'user': user}).data
 
     def get_CultivationAndStorage(self, obj):
-        return Section3Serializer(obj, many=False).data
+        user = self.context.get('user')
+        return Section3Serializer(obj, many=False, context={'user': user}).data
 
     def get_StrainCharacteristics(self, obj):
-        return Section4Serializer(obj, many=False).data
+        user = self.context.get('user')
+        return Section4Serializer(obj, many=False, context={'user': user}).data
 
     def get_GeneralInformation(self, obj):
-        return Section5Serializer(obj, many=False).data
+        user = self.context.get('user')
+        if user.is_authenticated:
+            return Section5Serializer(obj, many=False).data
 
 
 class StrainChangeRequestSerializer(serializers.ModelSerializer):
     strain = PreviewStrainSerializer(read_only=True)
     changed_by = UserSerializer(read_only=True)
+
     class Meta:
         model = StrainChangeRequestModel
-        fields = '__all__'
+        fields = ['strain', 'changed_by', 'changes', 'created_at', 'updated_at', 'approved']
 
     def validate_changes(self, value):
-        strain_fields = [field.name for field in StrainModel._meta.fields]
-
-        invalid_fields = [field for field in value.keys() if field not in strain_fields]
-        if invalid_fields:
-            raise serializers.ValidationError(f"Неверные поля: {', '.join(invalid_fields)}")
-
-        for field, field_value in value.items():
-            model_field = StrainModel._meta.get_field(field)
-
-            if isinstance(field_value, str) and model_field.get_internal_type() != 'CharField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть строкой.")
-            if isinstance(field_value, int) and model_field.get_internal_type() != 'IntegerField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть целым числом.")
-            if isinstance(field_value, float) and model_field.get_internal_type() != 'FloatField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть числом с плавающей точкой.")
-            if isinstance(field_value, bool) and model_field.get_internal_type() != 'BooleanField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть булевым значением.")
-
-            if isinstance(field_value, str) and model_field.get_internal_type() == 'DateField':
-                try:
-                    from datetime import datetime
-                    datetime.strptime(field_value, '%Y-%m-%d')
-                except ValueError:
-                    raise serializers.ValidationError(f"Поле '{field}' должно быть в формате даты 'YYYY-MM-DD'.")
-
+        errors = {}
+        try_validate_changes(value, errors)
+        if errors:
+            raise serializers.ValidationError(errors)
         return value
 
 
 class StrainNewRequestSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
+
     class Meta:
         model = StrainNewRequestModel
-        fields = '__all__'
+        fields = ['created_by', 'changes', 'created_at', 'updated_at', 'approved']
 
     def validate_changes(self, value):
+        value["CollectionCode"] = "VKM"
+        value["SubCollection"] = "F"
+
         required_fields = [
             'CollectionCode', 'Subcollection', 'Subcollection1', 'Genus', 'Species',
             'Strain', 'ReceivedFromRus', 'ReceivedFromEng',
             'ReceivedAs', 'ReceivedDate', 'TypeOfSubstrateRus', 'TypeOfSubstrateEng',
             'IsolatedFromRus', 'IsolatedFromEng', 'IncubationTemp', 'GrowthMedium',
-            'StorageMethods', 'Curator', 'Remakes', 'EntryDate', 'EditDate'
+            'StorageMethods', 'Curator', 'Remarks', 'EntryDate', 'EditDate'
         ]
 
-        for field in required_fields:
-            if field not in value or not value[field]:
-                raise serializers.ValidationError(f"Поле '{field}' обязательно для заполнения.")
+        errors = {}
+        for cur_field in required_fields:
+            if cur_field not in value or not value[cur_field]:
+                errors[cur_field] = f"Поле '{cur_field}' обязательно для заполнения."
 
-        if 'Species' in value and value['Species'] == 'sp.':
-            if 'AuthoritySp' in value and value['AuthoritySp']:
-                raise serializers.ValidationError(
-                    "Поле 'AuthoritySp' не должно быть заполнено, если в поле 'Species' указано 'sp.'")
+        if 'Species' in value and value['Species'] != 'sp.':
+            if 'AuthoritySp' not in value or not value['AuthoritySp']:
+                errors['AuthoritySp'] = "Поле 'AuthoritySp' обязательно для заполнения, если 'Species' не равно 'sp.'."
 
-        strain_fields = [field.name for field in StrainModel._meta.fields]
-        invalid_fields = [field for field in value.keys() if field not in strain_fields]
+        if errors:
+            raise serializers.ValidationError(errors)
 
-        if invalid_fields:
-            raise serializers.ValidationError(f"Неверные поля: {', '.join(invalid_fields)}")
+        try_validate_changes(value, errors)
 
-        for field, field_value in value.items():
-            model_field = StrainModel._meta.get_field(field)
-
-            if isinstance(field_value, str) and model_field.get_internal_type() != 'CharField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть строкой.")
-            if isinstance(field_value, int) and model_field.get_internal_type() != 'IntegerField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть целым числом.")
-            if isinstance(field_value, float) and model_field.get_internal_type() != 'FloatField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть числом с плавающей точкой.")
-            if isinstance(field_value, bool) and model_field.get_internal_type() != 'BooleanField':
-                raise serializers.ValidationError(f"Поле '{field}' должно быть булевым значением.")
-
-            if isinstance(field_value, str) and model_field.get_internal_type() == 'DateField':
-                try:
-                    from datetime import datetime
-                    datetime.strptime(field_value, '%Y-%m-%d')
-                except ValueError:
-                    raise serializers.ValidationError(f"Поле '{field}' должно быть в формате даты 'YYYY-MM-DD'.")
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return value
-
-
-
-
