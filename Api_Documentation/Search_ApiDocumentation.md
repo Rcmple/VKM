@@ -1,7 +1,7 @@
 
 ## 4. Search (Поиск)
 
-### **`[POST] /api/strains/search/`** – *Расширенный поиск штаммов по различным полям*
+### **`[GET] /api/strains/search/`** – *Расширенный поиск штаммов по различным полям*
 
 - **Описание:**  
   Этот эндпоинт позволяет выполнять гибкий и точный поиск штаммов по следующим полям:
@@ -15,26 +15,34 @@
   - `Country` — полнотекстовый поиск по стране
   - `Any` — полнотекстовый поиск по всем полям
 
-- **Формат запроса:**
+- **Формат запроса:**  
+  Параметры передаются в строке запроса URL следующим образом(Каких-то полей может и не быть):
 
-  ```json
-  {
-    "query": {
-      "Strain": "5075",
-      "TaxonName": "Sarcopodium vanillae",
-      "StatusOfStrain": "type",
-      "OtherCol": "CBS 12345",
-      "IsolatedFrom": "forest litter",
-      "Geographics": "southern Vietnam",
-      "Country": "Vietnam",
-      "Any": "vanillae Vietnam forest"
-    }
-  }
+  ```
+  /api/strains/search/?Strain=some_strain&TaxonName=some_taxon_name&StatusOfStrain=some_status&OtherCol=some_value&IsolatedFrom=some_location&Geographics=some_geographics&Country=some_country&Any=some_query
+  ```
+  Также перед параметрами и знаком '?' может отсутствовать '/'
+
+  ```
+  /api/strains/search?Strain=some_strain&TaxonName=some_taxon_name&StatusOfStrain=some_status&OtherCol=some_value&IsolatedFrom=some_location&Geographics=some_geographics&Country=some_country&Any=some_query
+  ```
+  
+- 
+  Пример запроса:
+
+  ```
+  /api/strains/search/?Strain=5075&TaxonName=Sarcopodium%20vanillae&StatusOfStrain=type&OtherCol=CBS%2012345&IsolatedFrom=forest%20litter&Geographics=southern%20Vietnam&Country=Vietnam&Any=vanillae%20Vietnam%20forest
   ```
 
 - **Параметры пагинации (в query-параметрах URL):**
   - `offset` – начальная позиция (по умолчанию 0)
   - `limit` – количество результатов (по умолчанию 100)
+
+  Пример с пагинацией:
+
+  ```
+  /api/strains/search/?Strain=5075&TaxonName=Sarcopodium%20vanillae&offset=0&limit=50
+  ```
 
 - **Ответ (успешный запрос, HTTP 200 OK):**
   ```json
@@ -64,11 +72,13 @@
         },
         "IsolationDate": "2022-07-12"
       }
+  
+      // ... другие результаты
     ]
   }
   ```
 
-- **Ответ (ошибка – отсутствует поле `query`, HTTP 400 BAD REQUEST):**
+- **Ответ (ошибка – отсутствует обязательный параметр, HTTP 400 BAD REQUEST):**
   ```json
   {
     "error": {
@@ -77,4 +87,3 @@
     }
   }
   ```
-
