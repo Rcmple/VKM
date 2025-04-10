@@ -80,14 +80,9 @@ class AddUserView(APIView):
     def post(self, request):
         serializer = AddUserSerializer(data=request.data)
         if serializer.is_valid():
-            user = User.objects.create_user(
-                username=serializer.validated_data['username'],
-                password=serializer.validated_data['password'],
-                email=serializer.validated_data.get('email'),
-                first_name=serializer.validated_data.get('first_name'),
-                last_name=serializer.validated_data.get('last_name')
-            )
-            if serializer.isModerator:
+            is_moder = serializer.validated_data.pop('isModerator')
+            user = serializer.save()
+            if is_moder:
                 user.groups.add('Moderator')
 
             return Response({"message": {
@@ -102,7 +97,7 @@ class AddUserView(APIView):
 class DeleteUserView(APIView):
     permission_classes = [IsModerator]
 
-    def post(self, request):
+    def delete(self, request):
         user = User.objects.get(id=request.data.get('user_id'))
         if user:
             user.delete()
