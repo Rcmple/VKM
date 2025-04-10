@@ -19,12 +19,8 @@ class AddUserSerializer(serializers.ModelSerializer):
     isModerator = serializers.BooleanField(default=False)
     class Meta:
         model = User
-        fields = ['username', 'password', 'email', 'first_name', 'last_name']
+        fields = ['username', 'password', 'email', 'first_name', 'last_name', 'isModerator']
         extra_kwargs = {'password': {'write_only': True}}
-
-    def validate(self, data):
-        self.isModerator = data.get('user').pop('isModerator', False)
-        return super().validate(data)
 
 
     def to_internal_value(self, data):
