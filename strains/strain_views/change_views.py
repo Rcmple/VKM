@@ -47,14 +47,21 @@ class StrainChangeRequestView(APIView):
 
     # Добавление заявки на изменение
     def post(self, request, strain_id_param):
+        try:
+            strain = StrainModel.objects.get(strain_id=strain_id_param)
+        except StrainModel.DoesNotExist:
+            return Response({
+                'error': {
+                    'ru': 'Штамм не найден',
+                    'en': 'Strain not found'
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
         serializer = StrainChangeRequestSerializer(data={
-            'strain': strain_id_param,
-            'changed_by': request.user.id,
             'changes': request.data.get('changes')
         })
 
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(strain=strain, changed_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -145,12 +152,11 @@ class StrainNewRequestView(APIView):
     # Добавление заявки на добавление
     def post(self, request):
         serializer = StrainNewRequestSerializer(data={
-            'created_by': request.user.id,
             'changes': request.data.get('changes')
         })
 
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -13,8 +13,8 @@ def parse_date(date_str):
         return None
 
 
-# pattern 1 Только английский язык, всегда начинается с заглавной буквы
-# pattern 2 Только английский язык, всегда с маленькой буквы
+# pattern 1 англ яз, одно слово, с большой буквы
+# pattern 2 англ яз, одно слово, с маленькой буквы
 # pattern 3 Только английский язык
 # pattern 4 Только английский язык, запрещен символ '&'
 # pattern 5 Только числа
@@ -28,9 +28,17 @@ def parse_date(date_str):
 # pattern 13 Только английский язык, всегда начинается с заглавной буквы, запрещен символ ';'
 # pattern 14 только русский
 
+def pattern1(value):
+    return len(value) == 1 and value.isalpha() and all('a' <= c.lower() <= 'z' for c in value[0]) and value[0].isupper()
+
+
+def pattern2(value):
+    return len(value) == 1 and value.isalpha() and all('a' <= c.lower() <= 'z' for c in value[0]) and value[0].islower()
+
+
 def try_validate_changes(value, errors):
     strain_model_fields = [field.name for field in StrainModel._meta.fields]
-    #В се регулярные выражения для паттернов
+    #Все регулярные выражения для паттернов
     patterns = {
         "pattern1": r'^[A-Z][^А-Яа-я]*$',
         "pattern2": r'^[^А-Яа-яA-Z]*$',
@@ -59,33 +67,34 @@ def try_validate_changes(value, errors):
         if sub_collection1 not in ["F", "FW"]:
             errors["Subcollection1"] = "Поле 'Subcollection1' должно быть равно 'F' или 'FW'."
 
-    genus = value.get("Genus", None)
+    genus = value.get("Genus", None).strip().split()
     if genus is not None:
-        if re.match(patterns["pattern1"], genus) is None:
-            errors["Genus"] = "Поле 'Genus' должно начинаться с заглавной буквы и содержать только латинский алфавит."
+        if not pattern1(genus):
+            errors["Genus"] = ("Поле 'Genus' должно содержать только одно слово на английском языке,"
+                               " начинающееся с заглавной буквы.")
 
-    species = value.get("Species", None)
+    species = value.get("Species", None).strip().split()
     if species is not None:
-        if re.match(patterns["pattern2"], species) is None:
-            errors["Species"] = ("Поле 'Species' должно начинаться с маленькой буквы и содержать только латинский "
-                                 "алфавит.")
+        if not pattern2(species):
+            errors["Species"] = ("Поле 'FormaSpecies' должно содержать только одно слово на английском языке,"
+                                      " начинающееся с строчной буквы.")
 
-    variant = value.get("Variant", None)
+    variant = value.get("Variant", None).strip().split()
     if variant is not None:
-        if re.match(patterns["pattern2"], variant) is None:
-            errors["Variant"] = ("Поле 'Variant' должно начинаться с маленькой буквы и содержать только латинский "
-                                 "алфавит.")
+        if not pattern2(variant):
+            errors["Variant"] = ("Поле 'FormaSpecies' должно содержать только одно слово на английском языке,"
+                                      " начинающееся с строчной буквы.")
 
-    forma = value.get("Forma", None)
+    forma = value.get("Forma", None).strip().split()
     if forma is not None:
-        if re.match(patterns["pattern2"], forma) is None:
-            errors["Forma"] = "Поле 'Forma' должно начинаться с маленькой буквы и содержать только латинский алфавит."
-
-    forma_species = value.get("FormaSpecies", None)
+        if not pattern2(forma):
+            errors["Forma"] = ("Поле 'FormaSpecies' должно содержать только одно слово на английском языке,"
+                                      " начинающееся с строчной буквы.")
+    forma_species = value.get("FormaSpecies", None).strip().split()
     if forma_species is not None:
-        if re.match(patterns["pattern3"], forma_species) is None:
-            errors["FormaSpecies"] = "Поле 'FormaSpecies' должно содержать только латинский алфавит."
-
+        if not pattern2(forma_species):
+            errors["FormaSpecies"] = ("Поле 'FormaSpecies' должно содержать только одно слово на английском языке,"
+                                      " начинающееся с строчной буквы.")
     strain = value.get("Strain", None)
     if strain is not None:
         try:
@@ -105,21 +114,21 @@ def try_validate_changes(value, errors):
             errors["AuthoritySubSp"] = ("Поле 'AuthoritySubSp' должно содержать только латинский"
                                         " алфавит и не допустим символ '&'.")
 
-    family = value.get("Family", None)
+    family = value.get("Family", None).strip().split()
     if family is not None:
-        if re.match(patterns["pattern1"], family) is None:
-            errors["Family"] = "Поле 'Family' должно начинаться с заглавной буквы и содержать только латинский алфавит."
-
-    order = value.get("Order", None)
+        if not pattern1(family):
+            errors["Family"] = ("Поле 'Family' должно содержать только одно слово на английском языке,"
+                                " начинающееся с заглавной буквы.")
+    order = value.get("Order", None).strip().split()
     if order is not None:
-        if re.match(patterns["pattern1"], order) is None:
-            errors["Order"] = "Поле 'Order' должно начинаться с заглавной буквы и содержать только латинский алфавит."
-
-    class_is = value.get("Class", None)
+        if not pattern1(order):
+            errors["Order"] = ("Поле 'Order' должно содержать только одно слово на английском языке,"
+                               " начинающееся с заглавной буквы.")
+    class_is = value.get("Class", None).strip().split()
     if class_is is not None:
-        if re.match(patterns["pattern1"], class_is) is None:
-            errors["Class"] = "Поле 'Class' должно начинаться с заглавной буквы и содержать только латинский алфавит."
-
+        if not pattern1(class_is):
+            errors["Class"] = ("Поле 'Class' должно содержать только одно слово на английском языке,"
+                               " начинающееся с заглавной буквы.")
     synonym = value.get("Synonym", None)
     if synonym is not None:
         if re.match(patterns["pattern3"], synonym) is None:

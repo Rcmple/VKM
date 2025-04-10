@@ -30,12 +30,6 @@ class StrainInfoView(APIView):
     def get(self, request, strain_id_param):
         # Беру всю информацию о Штамме
         try:
-            print(strain_id_param)
-            sorted_d = []
-            for cur in StrainModel.objects.all():
-                sorted_d.append(cur.strain_id)
-            sorted_d.sort()
-            print(sorted_d[:10])
             strain = StrainModel.objects.get(strain_id=strain_id_param)
         except StrainModel.DoesNotExist:
             return Response({
