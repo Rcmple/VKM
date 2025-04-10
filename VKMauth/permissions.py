@@ -4,7 +4,6 @@ from rest_framework.exceptions import PermissionDenied
 
 class IsModerator(BasePermission):
     def has_permission(self, request, view):
-        print("Im here")
         if request.user.is_authenticated and request.user.groups.filter(name='Moderator').exists():
             return True
         else:

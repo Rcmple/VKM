@@ -80,10 +80,7 @@ class AddUserView(APIView):
     def post(self, request):
         serializer = AddUserSerializer(data=request.data)
         if serializer.is_valid():
-            is_moder = serializer.validated_data.pop('isModerator')
             user = serializer.save()
-            if is_moder:
-                user.groups.add('Moderator')
 
             return Response({"message": {
                 "ru": "Пользователь успешно зарегистрирован",
